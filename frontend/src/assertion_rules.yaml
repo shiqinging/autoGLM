@@ -1,0 +1,393 @@
+# 断言规则配置文件示例
+# 定义哪些动作是正确的,哪些动作是错误的
+
+# ============================================================
+# 全局规则 - 适用于所有测试的基础配置
+# ============================================================
+global_rules:
+  # app_name: 被测应用的名称,用于标识测试目标
+  app_name: "微信小程序"
+  
+  # test_suite: 测试套件名称,用于标识当前测试集
+  test_suite: "无忧存预约下单"
+  
+  # default_confidence_threshold: 默认置信度阈值(0-1之间)
+  # 用于判断断言是否通过,值越高要求越严格
+  default_confidence_threshold: 0.7
+  
+  # timeout_seconds: 默认超时时间(秒)
+  # 等待某个条件满足的最长时间
+  timeout_seconds: 5
+  
+  # common_failure_indicators: 通用的失败指标列表
+  # 当屏幕上出现这些文本时,通常表示操作失败
+  common_failure_indicators:
+    - "网络错误"
+    - "加载失败"
+    - "服务器异常"
+    - "404"
+    - "页面不存在"
+    - "系统繁忙"
+  
+  # common_success_indicators: 通用的成功指标列表
+  # 当屏幕上出现这些文本时,通常表示操作成功
+  common_success_indicators:
+    - "加载完成"
+    - "操作成功"
+
+# ============================================================
+# 动作级别规则 - 针对特定类型的动作定义断言规则
+# ============================================================
+action_rules:
+  # 点击"我的"标签的规则
+  - # action_type: 动作类型,如 tap(点击)、swipe(滑动)、input(输入)等
+    action_type: "tap"
+    
+    # description: 对该动作的描述,便于理解规则的用途
+    description: "点击'我的'标签"
+    
+    # correct_conditions: 正确条件列表
+    # 当这些条件满足时,说明动作执行正确
+    correct_conditions:
+      - "页面跳转到'我的'页面"
+      - "能看到个人信息、设置等选项"
+      - "底部标签栏'我的'高亮显示"
+    
+    # incorrect_conditions: 错误条件列表
+    # 当这些条件满足时,说明动作执行失败
+    incorrect_conditions:
+      - "页面没有变化"
+      - "出现错误提示"
+      - "跳转到其他页面"
+    
+    # expected_screen_elements: 期望的屏幕元素列表
+    # 执行动作后,屏幕上应该出现这些元素
+    expected_screen_elements:
+      - "我的"
+      - "设置"
+      - "个人信息"
+    
+    # forbidden_screen_elements: 禁止出现的屏幕元素列表
+    # 执行动作后,屏幕上不应该出现这些元素
+    forbidden_screen_elements:
+      - "加载失败"
+      - "网络错误"
+    
+    # confidence_threshold: 该动作的置信度阈值
+    # 覆盖全局的 default_confidence_threshold
+    confidence_threshold: 0.7
+
+  # 点击"收藏"的规则
+  - action_type: "tap"
+    description: "点击'我的收藏'"
+    correct_conditions:
+      - "进入收藏列表页面"
+      - "能看到已收藏的项目"
+      - "页面标题显示'我的收藏'或'收藏'"
+    incorrect_conditions:
+      - "页面没有跳转"
+      - "进入了其他页面"
+      - "显示'暂无收藏'"
+    expected_screen_elements:
+      - "收藏"
+      - "小铁预发门店"
+    forbidden_screen_elements:
+      - "暂无收藏"
+      - "加载失败"
+    confidence_threshold: 0.7
+
+  # 点击门店的规则
+  - action_type: "tap"
+    description: "点击门店进入详情"
+    correct_conditions:
+      - "进入门店详情页面"
+      - "能看到门店信息、预约按钮"
+      - "页面显示门店名称"
+    incorrect_conditions:
+      - "页面没有跳转"
+      - "显示'门店不存在'"
+      - "跳转到错误页面"
+    expected_screen_elements:
+      - "门店"
+      - "预约"
+      - "立即预约"
+    forbidden_screen_elements:
+      - "门店不存在"
+      - "已下架"
+    confidence_threshold: 0.7
+
+  # 选择日期的规则
+  - action_type: "tap"
+    description: "选择预约日期"
+    correct_conditions:
+      - "日期选择器显示"
+      - "选中的日期高亮显示"
+      - "可以看到确认按钮"
+    incorrect_conditions:
+      - "日期选择器未显示"
+      - "选择失败"
+    expected_screen_elements:
+      - "日期"
+      - "确定"
+      - "取消"
+    forbidden_screen_elements:
+      - "该日期不可预约"
+      - "已满"
+    confidence_threshold: 0.6
+
+  # 确认订单的规则
+  - action_type: "tap"
+    description: "点击确认下单"
+    correct_conditions:
+      - "进入支付页面"
+      - "能看到订单信息"
+      - "显示支付金额"
+    incorrect_conditions:
+      - "显示库存不足"
+      - "订单创建失败"
+      - "页面没有跳转"
+    expected_screen_elements:
+      - "支付"
+      - "订单信息"
+      - "金额"
+    forbidden_screen_elements:
+      - "库存不足"
+      - "下单失败"
+    confidence_threshold: 0.8
+
+# ============================================================
+# 步骤级别规则 - 针对完整的测试步骤定义断言规则
+# ============================================================
+step_rules:
+  # 步骤1:从收藏进入门店
+  - # step_name: 步骤名称,用于标识该测试步骤
+    step_name: "从收藏进入门店"
+    
+    # step_description: 步骤描述,详细说明该步骤的目的
+    step_description: "从'我的'->'我的收藏'中找到门店并进入"
+    
+    # action_sequence: 动作序列列表
+    # 按顺序执行的动作描述
+    action_sequence:
+      - "点击底部'我的'标签"
+      - "点击'我的收藏'"
+      - "点击'小铁预发门店'"
+    
+    # success_criteria: 成功标准列表
+    # 当所有这些条件都满足时,认为该步骤成功
+    success_criteria:
+      - "成功进入小铁预发门店详情页"
+      - "能看到门店名称、预约按钮"
+      - "页面完全加载"
+    
+    # failure_indicators: 失败指标列表
+    # 当任何一个条件满足时,认为该步骤失败
+    failure_indicators:
+      - "任何一步点击失败"
+      - "出现'门店不存在'提示"
+      - "页面加载失败"
+      - "停留在错误页面"
+    
+    # intermediate_checks: 中间检查点字典
+    # 定义在动作序列中间需要验证的条件
+    # 键是检查点名称,值是该检查点的验证条件列表
+    intermediate_checks:
+      "点击'我的'后":
+        - "底部'我的'标签高亮"
+        - "页面显示个人中心内容"
+      
+      "点击'我的收藏'后":
+        - "进入收藏列表页面"
+        - "能看到'小铁预发门店'"
+      
+      "点击门店后":
+        - "进入门店详情页"
+        - "显示门店相关信息"
+
+  # 步骤2:预约下单
+  - step_name: "预约下单"
+    step_description: "选择预约时间(明天、中柜、17点)并确认下单"
+    
+    action_sequence:
+      - "点击'立即预约'按钮"
+      - "选择日期:明天"
+      - "选择柜型:中柜"
+      - "选择时间:下午17点"
+      - "点击'确认下单'按钮"
+    
+    success_criteria:
+      - "所有选项都成功选择"
+      - "进入支付页面"
+      - "订单信息显示正确"
+      - "金额显示正确"
+    
+    failure_indicators:
+      - "任何选项选择失败"
+      - "提示'该时间段不可预约'"
+      - "提示'库存不足'"
+      - "下单失败"
+      - "未进入支付页面"
+    
+    intermediate_checks:
+      "选择日期后":
+        - "日期显示为明天的日期"
+        - "日期选择器关闭"
+      
+      "选择柜型后":
+        - "'中柜'选项高亮或勾选"
+        - "显示中柜的价格"
+      
+      "选择时间后":
+        - "'下午17点'时间段高亮"
+        - "确认按钮可点击"
+      
+      "点击确认下单后":
+        - "页面跳转到支付页面"
+        - "显示订单摘要"
+
+  # 步骤3:支付流程
+  - step_name: "支付流程"
+    step_description: "完成支付操作(人工)"
+    
+    action_sequence:
+      - "等待人工选择支付方式"
+      - "等待人工输入支付密码"
+      - "等待支付完成"
+    
+    success_criteria:
+      - "支付成功"
+      - "显示'支付成功'页面"
+      - "能看到订单详情"
+    
+    failure_indicators:
+      - "支付失败"
+      - "显示'余额不足'"
+      - "显示'支付取消'"
+      - "支付超时"
+    
+    intermediate_checks:
+      "支付页面":
+        - "能看到支付金额"
+        - "能看到支付方式选择"
+        - "能看到'确认支付'按钮"
+
+# ============================================================
+# 场景特定规则 - 针对特定业务场景的定制化规则
+# ============================================================
+scenario_rules:
+  # 预约场景的特殊规则
+  # reservation_scenario: 场景标识符,用于引用该场景规则
+  reservation_scenario:
+    # name: 场景名称,便于理解场景用途
+    name: "预约下单场景"
+    
+    # time_constraints: 时间约束列表
+    # 定义预约时间的限制条件
+    time_constraints:
+      - "只能预约未来7天内的时间"
+      - "当天预约需要提前2小时"
+      - "营业时间:09:00-21:00"
+    
+    # cabinet_types: 柜型配置字典
+    # 定义各种柜型的属性,包括名称和价格范围
+    cabinet_types:
+      # small: 小柜配置
+      small:
+        # name: 柜型显示名称
+        name: "小柜"
+        # price_range: 价格范围 [最低价, 最高价]
+        price_range: [10, 30]
+      
+      # medium: 中柜配置
+      medium:
+        name: "中柜"
+        price_range: [30, 60]
+      
+      # large: 大柜配置
+      large:
+        name: "大柜"
+        price_range: [60, 100]
+    
+    # required_fields: 必填字段列表
+    # 定义预约流程中必须填写的字段
+    required_fields:
+      - "预约日期"
+      - "预约时间"
+      - "柜型"
+      - "联系方式"
+    
+    # payment_validation: 支付验证规则列表
+    # 定义支付环节需要验证的条件
+    payment_validation:
+      - "金额必须大于0"
+      - "金额必须与所选柜型价格一致"
+      - "必须选择支付方式"
+
+# ============================================================
+# 错误恢复规则 - 定义遇到错误时的恢复策略
+# ============================================================
+error_recovery:
+  # network_error: 网络错误场景
+  network_error:
+    # indicators: 错误指标列表
+    # 当屏幕上出现这些文本时,判定为该类型的错误
+    indicators:
+      - "网络错误"
+      - "连接超时"
+      - "请检查网络"
+    
+    # recovery_actions: 恢复动作列表
+    # 遇到该错误时应该执行的恢复操作
+    recovery_actions:
+      - "等待3秒后重试"
+      - "最多重试3次"
+  
+  # page_load_failure: 页面加载失败场景
+  page_load_failure:
+    indicators:
+      - "加载失败"
+      - "页面空白"
+      - "404"
+    recovery_actions:
+      - "返回上一页"
+      - "重新进入"
+  
+  # out_of_stock: 库存不足场景
+  out_of_stock:
+    indicators:
+      - "库存不足"
+      - "该时间段已满"
+      - "暂无库存"
+    recovery_actions:
+      - "选择其他时间段"
+      - "终止测试"
+
+# ============================================================
+# 断言策略配置 - 定义不同严格程度的断言策略
+# ============================================================
+assertion_strategy:
+  # default: 默认策略,用于普通步骤
+  default:
+    # confidence_threshold: 置信度阈值(0-1之间)
+    # 断言结果的置信度需要达到该值才算通过
+    confidence_threshold: 0.7
+    
+    # timeout: 超时时间(秒)
+    # 等待断言条件满足的最长时间
+    timeout: 3
+    
+    # retry_count: 重试次数
+    # 断言失败后自动重试的次数
+    retry_count: 0
+  
+  # critical: 关键步骤策略,用于重要的关键步骤
+  critical:
+    confidence_threshold: 0.8
+    timeout: 5
+    retry_count: 1
+  
+  # lenient: 宽松策略,用于不太重要的步骤
+  lenient:
+    confidence_threshold: 0.6
+    timeout: 2
+    retry_count: 0

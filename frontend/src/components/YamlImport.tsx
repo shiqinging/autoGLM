@@ -1,24 +1,44 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useAgentStore } from '@/store/useAgentStore';
-import { Button, Textarea } from '@/components/ui';
-import { Upload, Sparkles, Trash2 } from 'lucide-react';
+import { Button, Input, Select } from '@/components/ui';
+import { Upload, Sparkles, Trash2, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface YamlImportProps {
   onTaskStart?: (yamlContent: string, fileName?: string) => void;
 }
 
+interface Step {
+  action: string;
+  params?: Record<string, unknown>;
+}
+
 interface ParsedTask {
   name: string;
   target?: string;
   description?: string;
-  steps?: Array<{
-    action: string;
-    params?: Record<string, unknown>;
-  }>;
+  steps?: Step[];
   model?: string;
   maxSteps?: number;
 }
+
+// Action options for dropdown
+const ACTION_OPTIONS = [
+  { value: 'click', label: '点击 (Click)' },
+  { value: 'type', label: '输入 (Type)' },
+  { value: 'scroll', label: '滚动 (Scroll)' },
+  { value: 'navigate', label: '导航 (Navigate)' },
+  { value: 'wait', label: '等待 (Wait)' },
+  { value: 'screenshot', label: '截图 (Screenshot)' },
+];
+
+// Model options for dropdown
+const MODEL_OPTIONS = [
+  { value: 'glm-4v', label: 'GLM-4V' },
+  { value: 'glm-4', label: 'GLM-4' },
+  { value: 'gpt-4o', label: 'GPT-4o' },
+  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+];
 
 // Simple Label component for local use
 const Label: React.FC<{ className?: string; children: React.ReactNode }> = ({
@@ -30,74 +50,101 @@ const Label: React.FC<{ className?: string; children: React.ReactNode }> = ({
   </label>
 );
 
+// Simple YAML parser
+const parseYaml = (content: string): ParsedTask => {
+  const task: ParsedTask = {
+    name: '未命名任务',
+    steps: [],
+  };
+
+  const lines = content.split('\n');
+  let currentSection: keyof ParsedTask | null = null;
+  let currentStep: Partial<Step> | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    if (line.startsWith('name:')) {
+      task.name = line.split(':')[1]?.trim().replace(/['"]/g, '') || '未命名任务';
+    } else if (line.startsWith('target:')) {
+      task.target = line.split(':')[1]?.trim().replace(/['"]/g, '');
+    } else if (line.startsWith('description:')) {
+      task.description = line.split(':')[1]?.trim().replace(/['"]/g, '');
+    } else if (line.startsWith('model:')) {
+      task.model = line.split(':')[1]?.trim().replace(/['"]/g, '');
+    } else if (line.startsWith('maxSteps:')) {
+      task.maxSteps = parseInt(line.split(':')[1]?.trim() || '50', 10);
+    } else if (line.startsWith('steps:')) {
+      currentSection = 'steps';
+    } else if (currentSection === 'steps' && trimmed.startsWith('- action:')) {
+      if (currentStep) {
+        task.steps?.push(currentStep as Step);
+      }
+      currentStep = {
+        action: trimmed.split(':')[1]?.trim().replace(/['"]/g, '') || '',
+      };
+    } else if (currentSection === 'steps' && trimmed.startsWith('params:')) {
+      currentStep = currentStep || { action: 'unknown' };
+      currentStep.params = {};
+    }
+
+    if (currentSection === 'steps' && trimmed.startsWith('- coordinate:')) {
+      const coord = trimmed.split(':')[1]?.trim();
+      if (coord && currentStep) {
+        const [x, y] = coord.split(',').map((n) => parseInt(n.trim(), 10));
+        currentStep.params = { ...currentStep.params, x, y };
+      }
+    }
+  }
+
+  if (currentStep && currentSection === 'steps') {
+    task.steps?.push(currentStep as Step);
+  }
+
+  return task;
+};
+
+// Generate YAML from form data
+const generateYaml = (task: ParsedTask): string => {
+  let yaml = `name: ${task.name}\n`;
+  if (task.target) yaml += `target: ${task.target}\n`;
+  if (task.description) yaml += `description: ${task.description}\n`;
+  if (task.model) yaml += `model: ${task.model}\n`;
+  if (task.maxSteps) yaml += `maxSteps: ${task.maxSteps}\n`;
+
+  if (task.steps && task.steps.length > 0) {
+    yaml += 'steps:\n';
+    task.steps.forEach((step) => {
+      yaml += `  - action: ${step.action}\n`;
+      if (step.params && Object.keys(step.params).length > 0) {
+        yaml += '    params:\n';
+        Object.entries(step.params).forEach(([key, value]) => {
+          yaml += `      ${key}: ${value}\n`;
+        });
+      }
+    });
+  }
+
+  return yaml;
+};
+
 export const YamlImport: React.FC<YamlImportProps> = ({ onTaskStart }) => {
   const { addLog, status } = useAgentStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [yamlContent, setYamlContent] = useState('');
   const [fileName, setFileName] = useState('');
-  const [parsedTask, setParsedTask] = useState<ParsedTask | null>(null);
+  const [parsedTask, setParsedTask] = useState<ParsedTask>({
+    name: '',
+    target: '',
+    description: '',
+    model: 'glm-4v',
+    maxSteps: 50,
+    steps: [],
+  });
   const [parseError, setParseError] = useState<string | null>(null);
+  const [hasContent, setHasContent] = useState(false);
 
   const isRunning = status === 'running';
-
-  // Simple YAML parser (for basic task definitions)
-  const parseYaml = useCallback((content: string): ParsedTask => {
-    const task: ParsedTask = {
-      name: '未命名任务',
-      steps: [],
-    };
-
-    const lines = content.split('\n');
-    let currentSection: keyof ParsedTask | null = null;
-    let currentStep: Partial<NonNullable<ParsedTask['steps']>[number]> | null = null;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      // Top-level keys
-      if (line.startsWith('name:')) {
-        task.name = line.split(':')[1]?.trim().replace(/['"]/g, '') || '未命名任务';
-      } else if (line.startsWith('target:')) {
-        task.target = line.split(':')[1]?.trim().replace(/['"]/g, '');
-      } else if (line.startsWith('description:')) {
-        task.description = line.split(':')[1]?.trim().replace(/['"]/g, '');
-      } else if (line.startsWith('model:')) {
-        task.model = line.split(':')[1]?.trim().replace(/['"]/g, '');
-      } else if (line.startsWith('maxSteps:')) {
-        task.maxSteps = parseInt(line.split(':')[1]?.trim() || '50', 10);
-      } else if (line.startsWith('steps:')) {
-        currentSection = 'steps';
-      } else if (currentSection === 'steps' && trimmed.startsWith('- action:')) {
-        if (currentStep) {
-          task.steps?.push(currentStep as NonNullable<ParsedTask['steps']>[number]);
-        }
-        currentStep = {
-          action: trimmed.split(':')[1]?.trim().replace(/['"]/g, '') || '',
-        };
-      } else if (currentSection === 'steps' && trimmed.startsWith('params:')) {
-        // Simple params parsing
-        currentStep = currentStep || { action: 'unknown' };
-        currentStep.params = {};
-      }
-
-      // Handle nested items
-      if (currentSection === 'steps' && trimmed.startsWith('- coordinate:')) {
-        const coord = trimmed.split(':')[1]?.trim();
-        if (coord && currentStep) {
-          const [x, y] = coord.split(',').map((n) => parseInt(n.trim(), 10));
-          currentStep.params = { ...currentStep.params, x, y };
-        }
-      }
-    }
-
-    // Push last step
-    if (currentStep && currentSection === 'steps') {
-      task.steps?.push(currentStep as NonNullable<ParsedTask['steps']>[number]);
-    }
-
-    return task;
-  }, []);
 
   const handleFileUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,12 +161,12 @@ export const YamlImport: React.FC<YamlImportProps> = ({ onTaskStart }) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
-        setYamlContent(content);
 
         try {
           const parsed = parseYaml(content);
           setParsedTask(parsed);
           setParseError(null);
+          setHasContent(true);
           addLog('SUCCESS', `已加载任务文件：${file.name}`);
           addLog('INFO', `任务名称：${parsed.name}`);
           addLog('INFO', `步骤数量：${parsed.steps?.length || 0}`);
@@ -134,29 +181,55 @@ export const YamlImport: React.FC<YamlImportProps> = ({ onTaskStart }) => {
       };
       reader.readAsText(file);
 
-      // Reset input
       event.target.value = '';
     },
-    [parseYaml, addLog]
+    [addLog]
   );
 
-  const handleExecute = () => {
-    if (!yamlContent.trim()) {
-      setParseError('请先上传或输入 YAML 内容');
-      addLog('ERROR', 'YAML 内容为空');
-      return;
-    }
+  const updateTask = useCallback((updates: Partial<ParsedTask>) => {
+    setParsedTask((prev) => ({ ...prev, ...updates }));
+  }, []);
 
-    addLog('ACTION', `开始执行任务：${parsedTask?.name || '未命名任务'}`);
+  const addStep = useCallback(() => {
+    setParsedTask((prev) => ({
+      ...prev,
+      steps: [...(prev.steps || []), { action: 'click', params: {} }],
+    }));
+  }, []);
+
+  const updateStep = useCallback((index: number, updates: Partial<Step>) => {
+    setParsedTask((prev) => ({
+      ...prev,
+      steps: prev.steps?.map((step, i) => (i === index ? { ...step, ...updates } : step)),
+    }));
+  }, []);
+
+  const removeStep = useCallback((index: number) => {
+    setParsedTask((prev) => ({
+      ...prev,
+      steps: prev.steps?.filter((_, i) => i !== index),
+    }));
+  }, []);
+
+  const handleExecute = () => {
+    const yamlContent = generateYaml(parsedTask);
+    addLog('ACTION', `开始执行任务：${parsedTask.name}`);
     addLog('INFO', `文件：${fileName || '手动输入'}`);
     onTaskStart?.(yamlContent, fileName);
   };
 
   const handleClear = () => {
-    setYamlContent('');
+    setParsedTask({
+      name: '',
+      target: '',
+      description: '',
+      model: 'glm-4v',
+      maxSteps: 50,
+      steps: [],
+    });
     setFileName('');
-    setParsedTask(null);
     setParseError(null);
+    setHasContent(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -200,47 +273,144 @@ export const YamlImport: React.FC<YamlImportProps> = ({ onTaskStart }) => {
         )}
       </div>
 
-      {/* YAML Content Editor */}
-      <div className="space-y-2">
-        <Label>或直接输入 YAML 内容：</Label>
-        <Textarea
-          value={yamlContent}
-          onChange={(e) => setYamlContent(e.target.value)}
-          placeholder={`name: 示例任务
-target: https://example.com
-description: 这是一个示例任务
-maxSteps: 50
-steps:
-  - action: click
-    params:
-      x: 100
-      y: 200`}
-          className="min-h-[150px] font-mono text-sm bg-[var(--bg-input)] resize-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
-          disabled={isRunning}
-        />
-      </div>
-
-      {/* Parsed Task Preview */}
-      {parsedTask && (
-        <div className="border border-[var(--border)] rounded-lg p-3 bg-[var(--bg-secondary)]">
-          <p className="text-xs text-[var(--text-secondary)] mb-2">任务预览</p>
-          <div className="space-y-1">
-            <p className="text-sm text-[var(--text-primary)]">
-              <span className="text-[var(--text-muted)]">名称:</span> {parsedTask.name}
-            </p>
-            {parsedTask.target && (
-              <p className="text-sm text-[var(--text-primary)]">
-                <span className="text-[var(--text-muted)]">目标:</span> {parsedTask.target}
-              </p>
-            )}
-            {parsedTask.steps && parsedTask.steps.length > 0 && (
-              <p className="text-sm text-[var(--text-primary)]">
-                <span className="text-[var(--text-muted)]">步骤:</span> {parsedTask.steps.length} 个操作
-              </p>
-            )}
-          </div>
+      {/* Form Fields */}
+      <div className="space-y-4">
+        {/* Task Name */}
+        <div className="space-y-2">
+          <Label>任务名称</Label>
+          <Input
+            value={parsedTask.name}
+            onChange={(e) => updateTask({ name: e.target.value })}
+            placeholder="输入任务名称"
+            disabled={isRunning}
+          />
         </div>
-      )}
+
+        {/* Target URL */}
+        <div className="space-y-2">
+          <Label>目标 URL</Label>
+          <Input
+            value={parsedTask.target || ''}
+            onChange={(e) => updateTask({ target: e.target.value })}
+            placeholder="https://example.com"
+            disabled={isRunning}
+          />
+        </div>
+
+        {/* Description */}
+        <div className="space-y-2">
+          <Label>任务描述</Label>
+          <Input
+            value={parsedTask.description || ''}
+            onChange={(e) => updateTask({ description: e.target.value })}
+            placeholder="描述任务目标"
+            disabled={isRunning}
+          />
+        </div>
+
+        {/* Model Selection */}
+        <div className="space-y-2">
+          <Label>AI 模型</Label>
+          <Select
+            value={parsedTask.model || 'glm-4v'}
+            onChange={(e) => updateTask({ model: e.target.value })}
+            options={MODEL_OPTIONS}
+            disabled={isRunning}
+          />
+        </div>
+
+        {/* Max Steps */}
+        <div className="space-y-2">
+          <Label>最大步骤数</Label>
+          <Input
+            type="number"
+            value={parsedTask.maxSteps || 50}
+            onChange={(e) => updateTask({ maxSteps: parseInt(e.target.value) || 50 })}
+            disabled={isRunning}
+          />
+        </div>
+
+        {/* Steps Section */}
+        <div className="space-y-3 pt-4 border-t border-[var(--border)]">
+          <div className="flex items-center justify-between">
+            <Label>执行步骤</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addStep}
+              disabled={isRunning}
+              className="h-8"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              添加步骤
+            </Button>
+          </div>
+
+          {parsedTask.steps && parsedTask.steps.length > 0 ? (
+            <div className="space-y-3">
+              {parsedTask.steps.map((step, index) => (
+                <div
+                  key={index}
+                  className="flex items-start gap-2 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)]"
+                >
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--bg-tertiary)] text-xs text-[var(--text-secondary)]">
+                    {index + 1}
+                  </span>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <Select
+                      value={step.action}
+                      onChange={(e) => updateStep(index, { action: e.target.value })}
+                      options={ACTION_OPTIONS}
+                      disabled={isRunning}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        placeholder="X"
+                        value={(step.params?.x as number) || ''}
+                        onChange={(e) =>
+                          updateStep(index, {
+                            params: { ...step.params, x: parseInt(e.target.value) || 0 },
+                          })
+                        }
+                        disabled={isRunning}
+                        className="w-20"
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Y"
+                        value={(step.params?.y as number) || ''}
+                        onChange={(e) =>
+                          updateStep(index, {
+                            params: { ...step.params, y: parseInt(e.target.value) || 0 },
+                          })
+                        }
+                        disabled={isRunning}
+                        className="w-20"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => removeStep(index)}
+                    disabled={isRunning}
+                    className="h-10 w-10 shrink-0 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-[var(--text-muted)] text-sm border border-dashed border-[var(--border)] rounded-lg">
+              暂无步骤，点击"添加步骤"按钮添加
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Error Message */}
       {parseError && (
@@ -254,7 +424,7 @@ steps:
         <Button
           variant="outline"
           onClick={handleClear}
-          disabled={!yamlContent && !fileName}
+          disabled={!hasContent && parsedTask.steps?.length === 0}
           className="flex-1"
         >
           <Trash2 className="w-4 h-4 mr-2" />

@@ -246,18 +246,20 @@ export interface TabsProps {
   className?: string;
 }
 
-export const Tabs: React.FC<TabsProps> = ({ value, onValueChange, children, className }) => {
-  const context = { value, onValueChange };
+interface TabsContextValue {
+  value: string;
+  onValueChange: (value: string) => void;
+}
 
+const TabsContext = React.createContext<TabsContextValue | null>(null);
+
+export const Tabs: React.FC<TabsProps> = ({ value, onValueChange, children, className }) => {
   return (
-    <div className={cn('w-full', className)}>
-      {React.Children.map(children, (child) => {
-        if (React.isValidElement(child)) {
-          return React.cloneElement(child as React.ReactElement, context);
-        }
-        return child;
-      })}
-    </div>
+    <TabsContext.Provider value={{ value, onValueChange }}>
+      <div className={cn('w-full', className)}>
+        {children}
+      </div>
+    </TabsContext.Provider>
   );
 };
 
@@ -280,19 +282,20 @@ export interface TabsTriggerProps {
   className?: string;
 }
 
-export const TabsTrigger: React.FC<TabsTriggerProps & { value?: string; onValueChange?: (v: string) => void }> = ({
-  value,
+export const TabsTrigger: React.FC<TabsTriggerProps> = ({
+  value: triggerValue,
   children,
   className,
-  value: currentValue,
-  onValueChange,
 }) => {
-  const isActive = currentValue === value;
+  const context = React.useContext(TabsContext);
+  if (!context) throw new Error('TabsTrigger must be used within Tabs');
+  const { value: currentValue, onValueChange } = context;
+  const isActive = currentValue === triggerValue;
 
   return (
     <button
       type="button"
-      onClick={() => onValueChange?.(value)}
+      onClick={() => onValueChange(triggerValue)}
       className={cn(
         'flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200',
         isActive
@@ -312,12 +315,15 @@ export interface TabsContentProps {
   className?: string;
 }
 
-export const TabsContent: React.FC<TabsContentProps & { value?: string }> = ({
+export const TabsContent: React.FC<TabsContentProps> = ({
   value,
   children,
   className,
-  value: currentValue,
 }) => {
+  const context = React.useContext(TabsContext);
+  if (!context) throw new Error('TabsContent must be used within Tabs');
+  const { value: currentValue } = context;
+
   if (currentValue !== value) return null;
 
   return (

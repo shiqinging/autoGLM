@@ -56,7 +56,7 @@ interface ModelConfigModalProps {
 }
 
 export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ open, onOpenChange }) => {
-  const { setModelConfig, addLog } = useAgentStore();
+  const { setModelConfig, addLog, modelConfig } = useAgentStore();
 
   const {
     control,
@@ -64,6 +64,7 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ open, onOpen
     formState: { errors },
     watch,
     setValue,
+    reset,
   } = useForm<ModelConfigValues>({
     resolver: zodResolver(modelConfigSchema),
     defaultValues: {
@@ -75,6 +76,18 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ open, onOpen
   });
 
   const provider = watch('provider');
+
+  // Load saved config when modal opens
+  React.useEffect(() => {
+    if (open && modelConfig) {
+      reset({
+        provider: modelConfig.provider,
+        apiKey: modelConfig.apiKey,
+        baseUrl: modelConfig.baseUrl,
+        model: modelConfig.model,
+      });
+    }
+  }, [open, modelConfig, reset]);
 
   // Update baseUrl and model when provider changes
   React.useEffect(() => {

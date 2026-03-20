@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TaskForm } from '@/components/TaskForm';
 import { TerminalPanel } from '@/components/TerminalPanel';
 import { ModelConfigModal } from '@/components/ModelConfigModal';
@@ -8,6 +8,11 @@ import { Zap, Activity, Moon, Sun } from 'lucide-react';
 function App() {
   const { status, logs, theme, toggleTheme } = useAgentStore();
   const [showConfigModal, setShowConfigModal] = useState(false);
+
+  // Sync theme to DOM on mount and when theme changes
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-4 md:p-6 lg:p-8 transition-colors duration-300">
@@ -96,9 +101,9 @@ function App() {
         </header>
 
         {/* Main Layout - Wider, no VisionCanvas */}
-        <main className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <main className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[calc(100vh-200px)]">
           {/* Task Configuration - Full width on mobile, half on desktop */}
-          <section className="lg:col-span-1 min-h-[500px]">
+          <section className="lg:col-span-1">
             <TaskForm
               websocketUrl="ws://localhost:8080/ws"
               onTaskStart={(data) => {
@@ -112,7 +117,7 @@ function App() {
           </section>
 
           {/* Terminal Panel - Full width on mobile, half on desktop */}
-          <section className="lg:col-span-1 min-h-[500px]">
+          <section className="lg:col-span-1">
             <TerminalPanel />
           </section>
         </main>

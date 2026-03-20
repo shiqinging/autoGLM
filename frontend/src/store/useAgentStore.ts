@@ -82,8 +82,69 @@ const formatTimestamp = (): string => {
 // Maximum logs to keep in memory
 const DEFAULT_MAX_LOGS = 500;
 
+// LocalStorage keys
+const STORAGE_KEYS = {
+  THEME: 'autoGLM-theme',
+  MODEL_CONFIG: 'autoGLM-modelConfig',
+};
+
+// Simple base64 encoding/decoding for API key obfuscation
+// Note: This is not true encryption, just obfuscation to prevent casual viewing
+const obfuscate = (str: string): string => {
+  return btoa(encodeURIComponent(str));
+};
+
+const deobfuscate = (str: string): string => {
+  try {
+    return decodeURIComponent(atob(str));
+  } catch {
+    return str;
+  }
+};
+
+// Load initial state from localStorage
+const loadFromStorage = <T>(key: string, defaultValue: T): T => {
+  if (typeof window === 'undefined') {
+    return defaultValue;
+  }
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return defaultValue;
+    const parsed = JSON.parse(item);
+
+    // Deobfuscate apiKey if present
+    if (key === STORAGE_KEYS.MODEL_CONFIG && parsed && parsed.apiKey) {
+      parsed.apiKey = deobfuscate(parsed.apiKey);
+    }
+
+    return parsed;
+  } catch (e) {
+    console.error(`Failed to load ${key} from localStorage:`, e);
+    return defaultValue;
+  }
+};
+
+// Save state to localStorage
+const saveToStorage = <T>(key: string, value: T): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    // Obfuscate apiKey before saving
+    if (key === STORAGE_KEYS.MODEL_CONFIG && value) {
+      const valueToSave = { ...(value as any) };
+      if (valueToSave.apiKey) {
+        valueToSave.apiKey = obfuscate(valueToSave.apiKey);
+      }
+      localStorage.setItem(key, JSON.stringify(valueToSave));
+    } else {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch (e) {
+    console.error(`Failed to save ${key} to localStorage:`, e);
+  }
+};
+
 export const useAgentStore = create<AgentStore>((set, get) => ({
-  // Initial State
+  // Initial State - load from localStorage
   logs: [],
   status: TaskStatus.IDLE,
   currentTask: null,
@@ -91,8 +152,8 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   ws: null,
   isConnected: false,
   error: null,
-  theme: 'dark',
-  modelConfig: null,
+  theme: loadFromStorage(STORAGE_KEYS.THEME, 'dark' as 'dark' | 'light'),
+  modelConfig: loadFromStorage(STORAGE_KEYS.MODEL_CONFIG, null as ModelConfig | null),
 
   // Log Actions
   addLog: (level: LogLevel, message: string) => {
@@ -222,6 +283,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   // Theme Actions
   setTheme: (theme: 'dark' | 'light') => {
     document.documentElement.setAttribute('data-theme', theme);
+    saveToStorage(STORAGE_KEYS.THEME, theme);
     set({ theme });
   },
 
@@ -229,11 +291,13 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     const currentTheme = get().theme;
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', newTheme);
+    saveToStorage(STORAGE_KEYS.THEME, newTheme);
     set({ theme: newTheme });
   },
 
   // Model Config Actions
   setModelConfig: (config: ModelConfig | null) => {
+    saveToStorage(STORAGE_KEYS.MODEL_CONFIG, config);
     set({ modelConfig: config });
     if (config) {
       get().addLog('SUCCESS', `模型配置已保存：${config.provider}`);

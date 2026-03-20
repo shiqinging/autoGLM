@@ -16,13 +16,14 @@ import {
   TabsContent,
 } from '@/components/ui';
 import { YamlImport } from './YamlImport';
+import { AssertionRulesForm } from './AssertionRulesForm';
 import { Terminal, Sparkles, Loader2, Settings } from 'lucide-react';
 
 // Form Validation Schema - 只保留任务描述
 const taskFormSchema = z.object({
   taskDescription: z
     .string()
-    .min(5, '任务描述至少 5 个字符')
+    .min(1, '任务描述不能为空')
     .max(1000, '任务描述不能超过 1000 个字符'),
 });
 
@@ -48,7 +49,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 }) => {
   const { status, connect, disconnect, addLog, setCurrentTask, modelConfig } = useAgentStore();
   const isRunning = status === 'running';
-  const [activeTab, setActiveTab] = useState<'manual' | 'yaml'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'yaml' | 'assertion'>('manual');
 
   const {
     control,
@@ -124,10 +125,14 @@ export const TaskForm: React.FC<TaskFormProps> = ({
           {/* Model Config Button */}
           <button
             onClick={onOpenConfig}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-light)] hover:bg-[var(--bg-secondary)] transition-colors"
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+              modelConfig
+                ? '!border-green-500/50 bg-green-500/10 hover:bg-green-500/20'
+                : 'border-[var(--border-light)] hover:bg-[var(--bg-secondary)]'
+            }`}
           >
-            <Settings className="w-4 h-4 text-[var(--text-secondary)]" />
-            <span className="text-xs text-[var(--text-secondary)]">
+            <Settings className={`w-4 h-4 ${modelConfig ? 'text-green-500' : 'text-[var(--text-secondary)]'}`} />
+            <span className={`text-xs ${modelConfig ? 'text-green-500' : 'text-[var(--text-secondary)]'}`}>
               {modelConfig ? `已连接：${modelConfig.provider}` : '未配置'}
             </span>
           </button>
@@ -135,10 +140,11 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
         {/* Tab Panel */}
         <div className="mt-4">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'yaml')}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'yaml' | 'assertion')}>
             <TabsList className="w-full">
               <TabsTrigger value="manual">手动输入</TabsTrigger>
               <TabsTrigger value="yaml">YAML 导入</TabsTrigger>
+              <TabsTrigger value="assertion">断言规则</TabsTrigger>
             </TabsList>
 
             <TabsContent value="manual">
@@ -155,6 +161,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                         placeholder="描述您希望代理执行的操作，例如：打开微信并发送消息给张三"
                         disabled={isRunning}
                         className="min-h-[120px] disabled:opacity-60 resize-none"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSubmit(onSubmit)();
+                          }
+                        }}
                       />
                     )}
                   />
@@ -168,6 +180,12 @@ export const TaskForm: React.FC<TaskFormProps> = ({
             <TabsContent value="yaml">
               <div className="mt-4">
                 <YamlImport onTaskStart={handleYamlStart} />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="assertion">
+              <div className="mt-4">
+                <AssertionRulesForm />
               </div>
             </TabsContent>
           </Tabs>
