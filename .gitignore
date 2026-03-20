@@ -61,3 +61,11 @@ app_package_name.py
 
 .claude/
 .venv
+
+# Frontend (Vite/React)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/package-lock.json
