@@ -35,7 +35,7 @@ from phone_agent.xctest import list_devices as list_ios_devices
 
 
 def check_system_requirements(
-    device_type: DeviceType = DeviceType.ADB, wda_url: str = "http://localhost:8100"
+        device_type: DeviceType = DeviceType.ADB, wda_url: str = "http://localhost:8100"
 ) -> bool:
     """
     Check system requirements before running the agent.
@@ -330,8 +330,8 @@ def check_model_api(base_url: str, model_name: str, api_key: str = "EMPTY") -> b
             print("     1. Check your network connection")
             print("     2. Verify the server is responding")
         elif (
-            "Name or service not known" in error_msg
-            or "nodename nor servname" in error_msg
+                "Name or service not known" in error_msg
+                or "nodename nor servname" in error_msg
         ):
             print(f"   Error: Cannot resolve hostname")
             print("   Solution:")
@@ -733,10 +733,10 @@ def main():
 
     # Run system requirements check before proceeding
     if not check_system_requirements(
-        device_type,
-        wda_url=args.wda_url
-        if device_type == DeviceType.IOS
-        else "http://localhost:8100",
+            device_type,
+            wda_url=args.wda_url
+            if device_type == DeviceType.IOS
+            else "http://localhost:8100",
     ):
         sys.exit(1)
 
