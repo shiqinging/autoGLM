@@ -1159,19 +1159,11 @@ export const AssertionRulesForm: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">断言规则配置</h2>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">
-            配置 UI 自动化测试的断言规则和验证逻辑
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="default" className="glow-orange" onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            保存配置
-          </Button>
-        </div>
+      <div>
+        <h2 className="text-xl font-bold text-[var(--text-primary)]">断言规则配置</h2>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          配置 UI 自动化测试的断言规则和验证逻辑
+        </p>
       </div>
 
       {/* YAML Import Area */}

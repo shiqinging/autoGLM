@@ -15,7 +15,6 @@ import {
   TabsTrigger,
   TabsContent,
 } from '@/components/ui';
-import { YamlImport } from './YamlImport';
 import { AssertionRulesForm } from './AssertionRulesForm';
 import { Terminal, Sparkles, Loader2, Settings } from 'lucide-react';
 
@@ -36,7 +35,7 @@ const defaultValues: Partial<TaskFormValues> = {
 
 interface TaskFormProps {
   websocketUrl?: string;
-  onTaskStart?: (data: TaskFormValues | { type: 'yaml'; content: string; fileName?: string }) => void;
+  onTaskStart?: (data: TaskFormValues) => void;
   onTaskStop?: () => void;
   onOpenConfig?: () => void;
 }
@@ -49,7 +48,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 }) => {
   const { status, connect, disconnect, addLog, setCurrentTask, modelConfig } = useAgentStore();
   const isRunning = status === 'running';
-  const [activeTab, setActiveTab] = useState<'manual' | 'yaml' | 'assertion'>('manual');
+  const [activeTab, setActiveTab] = useState<'manual' | 'assertion'>('manual');
 
   const {
     control,
@@ -92,22 +91,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     }
   };
 
-  const handleYamlStart = (content: string, fileName?: string) => {
-    if (!modelConfig) {
-      addLog('ERROR', '请先配置模型连接');
-      onOpenConfig?.();
-      return;
-    }
-
-    addLog('ACTION', `开始执行 YAML 任务`);
-    addLog('INFO', `文件：${fileName || '手动输入'}`);
-    addLog('INFO', `使用 Provider: ${modelConfig.provider}`);
-
-    connect(websocketUrl);
-    setCurrentTask(fileName || 'YAML 任务');
-    onTaskStart?.({ type: 'yaml', content, fileName });
-  };
-
   return (
     <Card className="w-full h-full flex flex-col glass border-[var(--border)]">
       <CardHeader className="pb-4">
@@ -140,10 +123,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({
 
         {/* Tab Panel */}
         <div className="mt-4">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'yaml' | 'assertion')}>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'assertion')}>
             <TabsList className="w-full">
               <TabsTrigger value="manual">手动输入</TabsTrigger>
-              <TabsTrigger value="yaml">YAML 导入</TabsTrigger>
               <TabsTrigger value="assertion">断言规则</TabsTrigger>
             </TabsList>
 
@@ -175,12 +157,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({
                   )}
                 </div>
               </form>
-            </TabsContent>
-
-            <TabsContent value="yaml">
-              <div className="mt-4">
-                <YamlImport onTaskStart={handleYamlStart} />
-              </div>
             </TabsContent>
 
             <TabsContent value="assertion">
@@ -218,3 +194,4 @@ export const TaskForm: React.FC<TaskFormProps> = ({
     </Card>
   );
 };
+
